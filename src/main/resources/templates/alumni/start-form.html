@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Start Alumni Document Request</title>
+    <link rel="stylesheet" href="/webjars/bootstrap/5.1.3/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Start Alumni Document Request</h2>
+        <form th:action="@{/alumni/start}" method="post">
+            <div class="mb-3">
+                <label for="documentType" class="form-label">Document Type</label>
+                <select class="form-select" id="documentType" name="documentType" required>
+                    <option th:each="type : ${documentTypes}" th:value="${type}" th:text="${type}"></option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="alumniId" class="form-label">Alumni ID</label>
+                <input type="text" class="form-control" id="alumniId" name="alumniId" required>
+            </div>
+            <div class="mb-3">
+                <label for="paymentMethod" class="form-label">Payment Method</label>
+                <select class="form-select" id="paymentMethod" name="paymentMethod" required>
+                    <option th:each="method : ${paymentMethods}" th:value="${method}" th:text="${method}"></option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    </div>
+</body>
+</html>

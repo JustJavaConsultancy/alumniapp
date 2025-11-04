@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+              xmlns:flowable="http://flowable.org/bpmn"
+              xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+              xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+              xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+              typeLanguage="http://www.w3.org/2001/XMLSchema"
+              expressionLanguage="http://www.w3.org/1999/XPath"
+              targetNamespace="http://flowable.org/test">
+  <process id="alumniApp" name="Alumni Document Request Process" isExecutable="true">
+    <startEvent id="startEvent" name="Start">
+      <extensionElements>
+        <flowable:formProperty id="documentType" name="Document Type" type="enum" required="true">
+          <flowable:value id="transcript" name="Transcript"/>
+          <flowable:value id="certificate" name="Certificate"/>
+          <flowable:value id="letterOfAttestation" name="Letter of Attestation"/>
+        </flowable:formProperty>
+        <flowable:formProperty id="alumniId" name="Alumni ID" type="string" required="true"/>
+        <flowable:formProperty id="paymentMethod" name="Payment Method" type="enum" required="true">
+          <flowable:value id="remita" name="Remita"/>
+          <flowable:value id="paystack" name="Paystack"/>
+          <flowable:value id="interswitch" name="Interswitch"/>
+        </flowable:formProperty>
+      </extensionElements>
+    </startEvent>
+    <serviceTask id="calculatePayment" name="Calculate Payment Amount" flowable:class="org.flowable.engine.impl.bpmn.helper.CalculatePaymentAmountDelegate">
+      <extensionElements>
+        <flowable:field name="documentType" expression="${documentType}"/>
+        <flowable:field name="paymentAmount" expression="${paymentAmount}"/>
+      </extensionElements>
+    </serviceTask>
+    <userTask id="paymentTask" name="Make Payment" flowable:assignee="${alumniId}">
+      <extensionElements>
+        <flowable:formProperty id="paymentAmount" name="Payment Amount" type="string" required="true" expression="${paymentAmount}"/>
+        <flowable:formProperty id="paymentMethod" name="Payment Method" type="string" required="true" expression="${paymentMethod}"/>
+      </extensionElements>
+    </userTask>
+    <exclusiveGateway id="paymentGateway" name="Payment Successful?"/>
+    <serviceTask id="processPayment" name="Process Payment" flowable:class="org.flowable.engine.impl.bpmn.helper.ProcessPaymentDelegate">
+      <extensionElements>
+        <flowable:field name="paymentMethod" expression="${paymentMethod}"/>
+        <flowable:field name="paymentAmount" expression="${paymentAmount}"/>
+        <flowable:field name="alumniId" expression="${alumniId}"/>
+      </extensionElements>
+    </serviceTask>
+    <exclusiveGateway id="approvalGateway" name="Determine Approver"/>
+    <userTask id="academicRegistrarApproval" name="Academic Registrar Approval" flowable:assignee="${academicRegistrar}">
+      <extensionElements>
+        <flowable:formProperty id="alumniAcademicRecords" name="Alumni Academic Records" type="string" required="true" expression="${alumniAcademicRecords}"/>
+      </extensionElements>
+    </userTask>
+    <userTask id="hodApproval" name="HOD Approval" flowable:assignee="${hod}">
+      <extensionElements>
+        <flowable:formProperty id="alumniAcademicRecords" name="Alumni Academic Records" type="string" required="true" expression="${alumniAcademicRecords}"/>
+      </extensionElements>
+    </userTask>
+    <serviceTask id="retrieveAcademicRecords" name="Retrieve Academic Records" flowable:class="org.flowable.engine.impl.bpmn.helper.RetrieveAcademicRecordsDelegate">
+      <extensionElements>
+        <flowable:field name="alumniId" expression="${alumniId}"/>
+        <flowable:field name="alumniAcademicRecords" expression="${alumniAcademicRecords}"/>
+      </extensionElements>
+    </serviceTask>
+    <serviceTask id="generateDocument" name="Generate Document" flowable:class="org.flowable.engine.impl.bpmn.helper.GenerateDocumentDelegate">
+      <extensionElements>
+        <flowable:field name="documentType" expression="${documentType}"/>
+        <flowable:field name="alumniId" expression="${alumniId}"/>
+        <flowable:field name="documentLink" expression="${documentLink}"/>
+      </extensionElements>
+    </serviceTask>
+    <serviceTask id="sendNotification" name="Send Notification" flowable:class="org.flowable.engine.impl.bpmn.helper.SendNotificationDelegate">
+      <extensionElements>
+        <flowable:field name="alumniId" expression="${alumniId}"/>
+        <flowable:field name="documentLink" expression="${documentLink}"/>
+      </extensionElements>
+    </serviceTask>
+    <endEvent id="endEvent" name="End"/>
+    <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="calculatePayment"/>
+    <sequenceFlow id="flow2" sourceRef="calculatePayment" targetRef="paymentTask"/>
+    <sequenceFlow id="flow3" sourceRef="paymentTask" targetRef="paymentGateway"/>
+    <sequenceFlow id="flow4" sourceRef="paymentGateway" targetRef="processPayment">
+      <conditionExpression xsi:type="tFormalExpression">${paymentSuccessful == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow5" sourceRef="processPayment" targetRef="approvalGateway"/>
+    <sequenceFlow id="flow6" sourceRef="approvalGateway" targetRef="retrieveAcademicRecords">
+      <conditionExpression xsi:type="tFormalExpression">${documentType == 'transcript' || documentType == 'certificate'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow7" sourceRef="approvalGateway" targetRef="retrieveAcademicRecords">
+      <conditionExpression xsi:type="tFormalExpression">${documentType == 'letterOfAttestation'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow8" sourceRef="retrieveAcademicRecords" targetRef="academicRegistrarApproval">
+      <conditionExpression xsi:type="tFormalExpression">${documentType == 'transcript' || documentType == 'certificate'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow9" sourceRef="retrieveAcademicRecords" targetRef="hodApproval">
+      <conditionExpression xsi:type="tFormalExpression">${documentType == 'letterOfAttestation'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow10" sourceRef="academicRegistrarApproval" targetRef="generateDocument">
+      <conditionExpression xsi:type="tFormalExpression">${approvalStatus == 'approved'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow11" sourceRef="hodApproval" targetRef="generateDocument">
+      <conditionExpression xsi:type="tFormalExpression">${approvalStatus == 'approved'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow12" sourceRef="generateDocument" targetRef="sendNotification"/>
+    <sequenceFlow id="flow13" sourceRef="sendNotification" targetRef="endEvent"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_alumniApp">
+    <bpmndi:BPMNPlane bpmnElement="alumniApp" id="BPMNPlane_alumniApp">
+      <bpmndi:BPMNShape bpmnElement="startEvent">
+        <omgdc:Bounds x="150" y="200" width="30" height="30"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="calculatePayment">
+        <omgdc:Bounds x="350" y="180" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="paymentTask">
+        <omgdc:Bounds x="550" y="180" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="paymentGateway">
+        <omgdc:Bounds x="750" y="200" width="40" height="40"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="processPayment">
+        <omgdc:Bounds x="950" y="180" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="approvalGateway">
+        <omgdc:Bounds x="1150" y="200" width="40" height="40"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="retrieveAcademicRecords">
+        <omgdc:Bounds x="1350" y="180" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="academicRegistrarApproval">
+        <omgdc:Bounds x="1550" y="100" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="hodApproval">
+        <omgdc:Bounds x="1550" y="300" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="generateDocument">
+        <omgdc:Bounds x="1750" y="200" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sendNotification">
+        <omgdc:Bounds x="1950" y="200" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endEvent">
+        <omgdc:Bounds x="2150" y="200" width="30" height="30"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="flow1">
+        <omgdi:waypoint x="180" y="215"/>
+        <omgdi:waypoint x="350" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow2">
+        <omgdi:waypoint x="470" y="215"/>
+        <omgdi:waypoint x="550" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow3">
+        <omgdi:waypoint x="670" y="215"/>
+        <omgdi:waypoint x="750" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow4">
+        <omgdi:waypoint x="790" y="215"/>
+        <omgdi:waypoint x="950" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow5">
+        <omgdi:waypoint x="1070" y="215"/>
+        <omgdi:waypoint x="1150" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow6">
+        <omgdi:waypoint x="1190" y="215"/>
+        <omgdi:waypoint x="1350" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow7">
+        <omgdi:waypoint x="1190" y="215"/>
+        <omgdi:waypoint x="1350" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow8">
+        <omgdi:waypoint x="1470" y="215"/>
+        <omgdi:waypoint x="1550" y="140"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow9">
+        <omgdi:waypoint x="1470" y="215"/>
+        <omgdi:waypoint x="1550" y="340"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow10">
+        <omgdi:waypoint x="1670" y="140"/>
+        <omgdi:waypoint x="1750" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow11">
+        <omgdi:waypoint x="1670" y="340"/>
+        <omgdi:waypoint x="1750" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow12">
+        <omgdi:waypoint x="1870" y="215"/>
+        <omgdi:waypoint x="1950" y="215"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="flow13">
+        <omgdi:waypoint x="2070" y="215"/>
+        <omgdi:waypoint x="2150" y="215"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
